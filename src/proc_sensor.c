@@ -2,65 +2,49 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <ctype.h>
-#include <errno.h>
-#include <sys/stat.h>
+#include <regex.h>
 
-#define PROC_PATH   "/proc"
-#define OUTPUT_PATH "/tmp/sysmon/proc.dat"
-#define INTERVAL    5
+#include "config.h"
+#include "sensor_utils.h"
 
-int is_numeric(const char *str)
-{
-    if (*str == '\0')
-        return 0;
+#define PROCFS_PATH   "/proc"
 
-    while (*str)
-    {
-        if (!isdigit((unsigned char)*str))
-            return 0;
+int main(void) {
+    regex_t regex;
 
-        str++;
-    }
-
-    return 1;
-}
-
-int main(void)
-{
-    if (mkdir("/tmp/sysmon", 0755) == -1 && errno != EEXIST)
-    {
-        perror("mkdir");
+    // Ensure the output directory exist
+    if(ensure_data_directory() != 0) {
         return EXIT_FAILURE;
     }
 
-    while (1)
-    {
-        DIR *dir = opendir(PROC_PATH);
+    // Compile regex to match numeric directories names
+    if(regcomp(&regex, "^[0-9]+$", REG_EXTENDED) != 0) {
+        fprintf(stderr, "Failed to compile");
+        return EXIT_FAILURE;
+    }
 
-        if (dir == NULL)
-        {
+    while (1) {
+
+
+        DIR *dir = opendir(PROCFS_PATH);
+        if (dir == NULL) {
             perror("opendir");
-            return EXIT_FAILURE;
+            break;
         }
 
         struct dirent *entry;
         int process_count = 0;
 
-        while ((entry = readdir(dir)) != NULL)
-        {
-            if (is_numeric(entry->d_name))
-            {
+        while ((entry = readdir(dir)) != NULL) {
+            if (regexec(&regex, entry->d_name, 0, NULL, 0) == 0) {
                 process_count++;
             }
         }
 
         closedir(dir);
 
-        FILE *output = fopen(OUTPUT_PATH, "w");
-
-        if (output == NULL)
-        {
+        FILE *output = fopen(PROC_PATH, "w");
+        if (output == NULL) {
             perror("fopen output");
             return EXIT_FAILURE;
         }
