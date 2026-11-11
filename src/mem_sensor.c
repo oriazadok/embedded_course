@@ -14,6 +14,7 @@ int main(void) {
     char key[64];
     unsigned long value;
 
+    // Ensure the output directory exist
     if(ensure_data_directory() != 0) {
         return EXIT_FAILURE;
     }
