@@ -52,5 +52,5 @@ int main(void) {
         sleep(INTERVAL);
     }
 
-    return EXIT_SUCCESS;
+    return 0;
 }

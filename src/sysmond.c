@@ -1,29 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
-#include <sys/stat.h>
 
-#define DATA_DIR      "/tmp/sysmon"
-#define MEM_PATH      DATA_DIR "/mem.dat"
-#define CPU_PATH      DATA_DIR "/cpu.dat"
-#define PROC_PATH     DATA_DIR "/proc.dat"
-#define INTERVAL      5
+#include "config.h"
+#include "sensor_utils.h"
 
-void print_file(const char *path)
-{
+void print_file(const char *path) {
+
     FILE *file = fopen(path, "r");
-
-    if (file == NULL)
-    {
+    if (file == NULL) {
         perror(path);
         return;
     }
 
     char buffer[256];
 
-    while (fgets(buffer, sizeof(buffer), file) != NULL)
-    {
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
         printf("%s", buffer);
     }
 
@@ -31,11 +23,9 @@ void print_file(const char *path)
 }
 
 int main(void)
-{
-    // Ensure the data directory exists
-    if (mkdir(DATA_DIR, 0755) == -1 && errno != EEXIST)
-    {
-        perror("mkdir");
+{   
+    // Ensure the output directory exist
+    if(ensure_data_directory() != 0) {
         return EXIT_FAILURE;
     }
 
@@ -61,5 +51,5 @@ int main(void)
         sleep(INTERVAL);
     }
 
-    return EXIT_SUCCESS;
+    return 0;
 }
