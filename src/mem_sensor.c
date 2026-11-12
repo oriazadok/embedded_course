@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 #include "config.h"
 #include "sensor_utils.h"
@@ -15,7 +14,7 @@ int main(void) {
     unsigned long value;
 
     // Ensure the output directory exist
-    if(ensure_data_directory() != 0) {
+    if (ensure_data_directory() != 0) {
         return EXIT_FAILURE;
     }
 

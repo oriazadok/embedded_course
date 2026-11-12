@@ -13,19 +13,19 @@ int main(void) {
     regex_t regex;
 
     // Ensure the output directory exist
-    if(ensure_data_directory() != 0) {
+    if (ensure_data_directory() != 0) {
         return EXIT_FAILURE;
     }
 
     // Compile regex to match numeric directories names
     if(regcomp(&regex, "^[0-9]+$", REG_EXTENDED) != 0) {
-        fprintf(stderr, "Failed to compile");
+        fprintf(stderr, "Failed to compile regex\n");
         return EXIT_FAILURE;
     }
 
     while (1) {
 
-
+        // Open /proc directory
         DIR *dir = opendir(PROCFS_PATH);
         if (dir == NULL) {
             perror("opendir");
@@ -43,18 +43,24 @@ int main(void) {
 
         closedir(dir);
 
+        // Open the file we want to write the data we want
         FILE *output = fopen(PROC_PATH, "w");
         if (output == NULL) {
             perror("fopen output");
-            return EXIT_FAILURE;
+            break;
         }
 
+        // Write process count
         fprintf(output, "Processes: %d\n", process_count);
 
+        // Clean up
         fclose(output);
 
         sleep(INTERVAL);
     }
 
-    return EXIT_SUCCESS;
+    // Release regex resources
+    regfree(&regex);
+
+    return 0;
 }

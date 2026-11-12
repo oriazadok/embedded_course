@@ -7,14 +7,16 @@
 
 void print_file(const char *path) {
 
+    char buffer[256];
+
+    // Open the data file 
     FILE *file = fopen(path, "r");
     if (file == NULL) {
         perror(path);
         return;
     }
 
-    char buffer[256];
-
+    // Read and print the file line by line
     while (fgets(buffer, sizeof(buffer), file) != NULL) {
         printf("%s", buffer);
     }
@@ -22,15 +24,13 @@ void print_file(const char *path) {
     fclose(file);
 }
 
-int main(void)
-{   
+int main(void) {   
     // Ensure the output directory exist
     if(ensure_data_directory() != 0) {
         return EXIT_FAILURE;
     }
 
-    while (1)
-    {
+    while (1) {
         printf("\n=================================\n");
         printf("       SYSTEM MONITOR REPORT     \n");
         printf("=================================\n");
