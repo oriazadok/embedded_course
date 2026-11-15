@@ -30,6 +30,33 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
+    const char *sensors[] = {
+        "./bin/mem_sensor",
+        "./bin/cpu_sensor",
+        "./bin/proc_sensor"
+    };
+
+    // Create 3 child processes
+    for (int i = 0; i < 3; i++) {
+        pid_t pid = fork();
+
+        if (pid < 0) {
+            perror("fork");
+            return EXIT_FAILURE;
+        }
+
+        if (pid == 0) {
+            // Child executes its sensor
+            execl(sensors[i], sensors[i], (char *)NULL);
+
+            // Only reached if execl fails
+            perror("execl");
+            _exit(EXIT_FAILURE);
+        }
+    }
+
+    // Parent process prints the reports
+    sleep(INTERVAL);
     while (1) {
         printf("\n=================================\n");
         printf("       SYSTEM MONITOR REPORT     \n");
