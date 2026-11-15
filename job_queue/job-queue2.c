@@ -12,8 +12,6 @@ struct job {
 /* A linked list of pending jobs.  */
 struct job* job_queue = NULL;
 
-// extern void process_job (struct job*);
-
 void process_job (struct job *job) {
   printf("job is: %d , thread: %lu\n", job->id, pthread_self());
 }
@@ -22,14 +20,13 @@ void process_job (struct job *job) {
 pthread_mutex_t job_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Process queued jobs until the queue is empty.  */
-
-void* thread_function (void* arg)
-{
+void* thread_function (void* arg) {
   while (1) {
     struct job* next_job;
 
     /* Lock the mutex on the job queue.  */
     pthread_mutex_lock (&job_queue_mutex);
+
     /* Now it's safe to check if the queue is empty.  */
     if (job_queue == NULL)
       next_job = NULL;
@@ -52,10 +49,9 @@ void* thread_function (void* arg)
     /* Clean up.  */
     free (next_job);
   }
+
   return NULL;
 }
-
-
 
 int main() {
 
