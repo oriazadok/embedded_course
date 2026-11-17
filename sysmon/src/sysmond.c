@@ -1,9 +1,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #include "config.h"
 #include "sensor_utils.h"
+
+pid_t mem_pid = -1;
+pid_t cpu_pid = -1;
+pid_t proc_pid = -1;
+
+int mem_active = 1;
+int cpu_active = 1;
+int proc_active = 1;
+
+
+void signal_handler(int sig) {
+
+    pid_t pid;
+    int status;
+
+    while((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        if(pid == mem_pid) {
+            mem_active = 0;
+        } else if(pid == cpu_pid) {
+            cpu_active = 0;
+        } else if(pid == proc_pid) {
+            proc_active = 0;
+        }
+    }
+}
 
 void print_file(const char *path) {
 
@@ -24,7 +51,12 @@ void print_file(const char *path) {
     fclose(file);
 }
 
-int main(void) {   
+int main(void) {
+
+    struct sigaction sa;
+    sa.sa_handler = signal_handler;
+    sigaction(SIGCHLD, &sa, NULL);
+
     // Ensure the output directory exist
     if(ensure_data_directory() != 0) {
         return EXIT_FAILURE;
@@ -53,6 +85,14 @@ int main(void) {
             perror("execl");
             _exit(EXIT_FAILURE);
         }
+
+        if (i == 0) {
+            mem_pid = pid;
+        } else if (i == 1) {
+            cpu_pid = pid;
+        } else if (i == 2) {
+            proc_pid = pid;
+        }
     }
 
     // Parent process prints the reports
@@ -63,19 +103,35 @@ int main(void) {
         printf("=================================\n");
 
         printf("\n[MEMORY]\n");
-        print_file(MEM_PATH);
+        if (mem_active) {
+            print_file(MEM_PATH);
+        } else {
+            printf("Memory sensor unavailable\n");
+        }
 
         printf("\n[CPU LOAD]\n");
-        print_file(CPU_PATH);
+        if (cpu_active) {
+            print_file(CPU_PATH);
+        } else {
+            printf("CPU sensor unavailable\n");
+        }
 
         printf("\n[PROCESSES]\n");
-        print_file(PROC_PATH);
+        if (proc_active) {
+            print_file(PROC_PATH);
+        } else {
+            printf("Proc sensor unavailable\n");
+        }
 
         printf("\n=================================\n");
 
         fflush(stdout);
 
         sleep(INTERVAL);
+
+        if(!mem_active && !cpu_active && !proc_active) {
+            break;
+        }
     }
 
     return 0;

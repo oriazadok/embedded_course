@@ -1,21 +1,25 @@
 CC = gcc
-CFLAGS = -Wall -g -Iinc
 
-all: bin/sysmond bin/cpu_sensor bin/mem_sensor bin/proc_sensor
+CFLAGS = -Wall -g
+CPPFLAGS = -I. -Iinc
 
-# Compile: any .c file -> .o object file
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+TARGETS = bin/sysmond bin/mem_sensor bin/cpu_sensor bin/proc_sensor
 
-# Link: bin/foo from src/foo.o + src/sensor_utils.o
-# $^ matches all the prerequisites (no duplicates)
-bin/%: src/%.o src/sensor_utils.o
+OBJECTS = src/sysmond.o src/mem_sensor.o src/cpu_sensor.o src/proc_sensor.o src/sensor_utils.o
+
+all: bin $(OBJECTS) $(TARGETS)
+
+bin:
 	mkdir -p bin
-	$(CC) $^ $(LDLIBS) -o $@
+
+src/%.o: src/%.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+bin/%: src/%.o src/sensor_utils.o
+	$(CC) $^ -o $@
 
 clean:
-	rm -f src/*.o bin/*
+	rm -f src/*.o
+	rm -f $(TARGETS)
 
 .PHONY: all clean
-
-.INTERMEDIATE: src/sensor_utils.o
