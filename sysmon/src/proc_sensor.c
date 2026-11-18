@@ -9,18 +9,18 @@
 
 #define PROCFS_PATH   "/proc"
 
-int main(void) {
+void* proc_sensor(void *arg) {
     regex_t regex;
 
     // Ensure the output directory exist
     if (ensure_data_directory() != 0) {
-        return EXIT_FAILURE;
+        return NULL;
     }
 
     // Compile regex to match numeric directories names
     if(regcomp(&regex, "^[0-9]+$", REG_EXTENDED) != 0) {
         fprintf(stderr, "Failed to compile regex\n");
-        return EXIT_FAILURE;
+        return NULL;
     }
 
     while (1) {
@@ -43,18 +43,22 @@ int main(void) {
 
         closedir(dir);
 
-        // Open the file we want to write the data we want
+        // Lock the output file so sysmond can't read it while we rewrite it
+        pthread_mutex_lock(&proc_lock);
+
         FILE *output = fopen(PROC_PATH, "w");
         if (output == NULL) {
             perror("fopen output");
+            pthread_mutex_unlock(&proc_lock);
             break;
         }
 
         // Write process count
         fprintf(output, "Processes: %d\n", process_count);
 
-        // Clean up
         fclose(output);
+
+        pthread_mutex_unlock(&proc_lock);
 
         sleep(INTERVAL);
     }
@@ -62,5 +66,5 @@ int main(void) {
     // Release regex resources
     regfree(&regex);
 
-    return 0;
+    return NULL;
 }

@@ -1,45 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <signal.h>
-#include <sys/wait.h>
+#include <pthread.h>
 
 #include "config.h"
 #include "sensor_utils.h"
+#include "sensors.h"
 
-pid_t mem_pid = -1;
-pid_t cpu_pid = -1;
-pid_t proc_pid = -1;
-
-int mem_active = 1;
-int cpu_active = 1;
-int proc_active = 1;
-
-
-void signal_handler(int sig) {
-
-    pid_t pid;
-    int status;
-
-    while((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        if(pid == mem_pid) {
-            mem_active = 0;
-        } else if(pid == cpu_pid) {
-            cpu_active = 0;
-        } else if(pid == proc_pid) {
-            proc_active = 0;
-        }
-    }
-}
-
-void print_file(const char *path) {
+void print_file(const char *path, pthread_mutex_t *lock) {
 
     char buffer[256];
 
-    // Open the data file 
+    // Lock the file so the sensor can't rewrite it while we read it
+    pthread_mutex_lock(lock);
+
+    // Open the data file
     FILE *file = fopen(path, "r");
     if (file == NULL) {
         perror(path);
+        pthread_mutex_unlock(lock);
         return;
     }
 
@@ -49,50 +28,35 @@ void print_file(const char *path) {
     }
 
     fclose(file);
+
+    pthread_mutex_unlock(lock);
 }
 
 int main(void) {
 
-    struct sigaction sa;
-    sa.sa_handler = signal_handler;
-    sigaction(SIGCHLD, &sa, NULL);
+    pthread_t mem_thread;
+    pthread_t cpu_thread;
+    pthread_t proc_thread;
 
     // Ensure the output directory exist
     if(ensure_data_directory() != 0) {
         return EXIT_FAILURE;
     }
 
-    const char *sensors[] = {
-        "./bin/mem_sensor",
-        "./bin/cpu_sensor",
-        "./bin/proc_sensor"
-    };
+    // Create the sensor threads
+    if (pthread_create(&mem_thread, NULL, mem_sensor, NULL) != 0) {
+        fprintf(stderr, "Failed to create memory thread\n");
+        return EXIT_FAILURE;
+    }
 
-    // Create 3 child processes
-    for (int i = 0; i < 3; i++) {
-        pid_t pid = fork();
+    if (pthread_create(&cpu_thread, NULL, cpu_sensor, NULL) != 0) {
+        fprintf(stderr, "Failed to create CPU thread\n");
+        return EXIT_FAILURE;
+    }
 
-        if (pid < 0) {
-            perror("fork");
-            return EXIT_FAILURE;
-        }
-
-        if (pid == 0) {
-            // Child executes its sensor
-            execl(sensors[i], sensors[i], (char *)NULL);
-
-            // Only reached if execl fails
-            perror("execl");
-            _exit(EXIT_FAILURE);
-        }
-
-        if (i == 0) {
-            mem_pid = pid;
-        } else if (i == 1) {
-            cpu_pid = pid;
-        } else if (i == 2) {
-            proc_pid = pid;
-        }
+    if (pthread_create(&proc_thread, NULL, proc_sensor, NULL) != 0) {
+        fprintf(stderr, "Failed to create process thread\n");
+        return EXIT_FAILURE;
     }
 
     // Parent process prints the reports
@@ -103,36 +67,25 @@ int main(void) {
         printf("=================================\n");
 
         printf("\n[MEMORY]\n");
-        if (mem_active) {
-            print_file(MEM_PATH);
-        } else {
-            printf("Memory sensor unavailable\n");
-        }
+        print_file(MEM_PATH, &mem_lock);
 
         printf("\n[CPU LOAD]\n");
-        if (cpu_active) {
-            print_file(CPU_PATH);
-        } else {
-            printf("CPU sensor unavailable\n");
-        }
+        print_file(CPU_PATH, &cpu_lock);
 
         printf("\n[PROCESSES]\n");
-        if (proc_active) {
-            print_file(PROC_PATH);
-        } else {
-            printf("Proc sensor unavailable\n");
-        }
+        print_file(PROC_PATH, &proc_lock);
 
         printf("\n=================================\n");
 
         fflush(stdout);
 
         sleep(INTERVAL);
-
-        if(!mem_active && !cpu_active && !proc_active) {
-            break;
-        }
     }
+
+    // Wait for sensor threads to finish
+    pthread_join(mem_thread, NULL);
+    pthread_join(cpu_thread, NULL);
+    pthread_join(proc_thread, NULL);
 
     return 0;
 }

@@ -8,14 +8,14 @@
 
 #define MEMINFO_PATH "/proc/meminfo"
 
-int main(void) {
+void* mem_sensor(void *arg) {
     char line[256];
     char key[64];
     unsigned long value;
 
     // Ensure the output directory exist
     if (ensure_data_directory() != 0) {
-        return EXIT_FAILURE;
+        return NULL;
     }
 
     while (1) {
@@ -24,15 +24,18 @@ int main(void) {
         FILE *input = fopen(MEMINFO_PATH, "r");
         if (input == NULL) {
             perror("fopen meminfo");
-            return EXIT_FAILURE;
+            return NULL;
         }
 
-        // Open the file we want to write the data we want
+        // Lock the output file so sysmond can't read it while we rewrite it
+        pthread_mutex_lock(&mem_lock);
+
         FILE *output = fopen(MEM_PATH, "w");
         if (output == NULL) {
             perror("fopen output");
+            pthread_mutex_unlock(&mem_lock);
             fclose(input);
-            return EXIT_FAILURE;
+            return NULL;
         }
 
         // Read /proc/meminfo line by line
@@ -43,7 +46,7 @@ int main(void) {
                 continue;
             }
 
-            // Write the lines we want to focus on 
+            // Write the lines we want to focus on
             if (strcmp(key, "MemTotal:") == 0 ||
                 strcmp(key, "MemFree:") == 0 ||
                 strcmp(key, "MemAvailable:") == 0 ||
@@ -55,12 +58,14 @@ int main(void) {
             }
         }
 
-        // Clean up
-        fclose(input);
         fclose(output);
+
+        pthread_mutex_unlock(&mem_lock);
+
+        fclose(input);
 
         sleep(INTERVAL);
     }
 
-    return 0;
+    return NULL;
 }
