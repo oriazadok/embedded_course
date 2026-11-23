@@ -15,14 +15,14 @@ int main(void) {
     char key[64];
     unsigned long value;
 
-    while (1) {
+    // Open the mem info file
+    FILE *input = fopen(MEMINFO_PATH, "r");
+    if (input == NULL) {
+        perror("fopen meminfo");
+        return EXIT_FAILURE;
+    }
 
-        // Open the mem info file
-        FILE *input = fopen(MEMINFO_PATH, "r");
-        if (input == NULL) {
-            perror("fopen meminfo");
-            return EXIT_FAILURE;
-        }
+    while (1) {
 
         // Read /proc/meminfo line by line
         while (fgets(line, sizeof(line), input) != NULL) {
@@ -43,15 +43,15 @@ int main(void) {
             } else if (strcmp(key, "SwapFree:") == 0){
                 md.swap_free = value;
             }
-
         }
+
         write(STDOUT_FILENO, &md, sizeof(md));
-
-        // Clean up
-        fclose(input);
-
+        
         sleep(INTERVAL);
     }
+
+    // Clean up
+    fclose(input);
 
     return 0;
 }

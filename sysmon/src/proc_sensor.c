@@ -5,7 +5,6 @@
 #include <dirent.h>
 #include <regex.h>
 
-
 #include <config.h>
 #include <sysmon_ipc.h>
 
@@ -44,10 +43,10 @@ int main(void) {
 
         
         pd.total_procs = process_count;
-        fprintf(stderr, "total_procs isisii: %d\n", pd.total_procs);
 
         int proc_fd = open(PROC_FIFO_PATH, O_WRONLY);
         write(proc_fd, &pd, sizeof(pd));
+        close(proc_fd);
         
         sleep(INTERVAL);
     }
