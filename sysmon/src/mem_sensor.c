@@ -3,20 +3,17 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "config.h"
-#include "sensor_utils.h"
+#include <config.h>
+#include <sysmon_ipc.h>
 
 #define MEMINFO_PATH "/proc/meminfo"
+
+MemData md;
 
 int main(void) {
     char line[256];
     char key[64];
     unsigned long value;
-
-    // Ensure the output directory exist
-    if (ensure_data_directory() != 0) {
-        return EXIT_FAILURE;
-    }
 
     while (1) {
 
@@ -24,14 +21,6 @@ int main(void) {
         FILE *input = fopen(MEMINFO_PATH, "r");
         if (input == NULL) {
             perror("fopen meminfo");
-            return EXIT_FAILURE;
-        }
-
-        // Open the file we want to write the data we want
-        FILE *output = fopen(MEM_PATH, "w");
-        if (output == NULL) {
-            perror("fopen output");
-            fclose(input);
             return EXIT_FAILURE;
         }
 
@@ -43,21 +32,23 @@ int main(void) {
                 continue;
             }
 
-            // Write the lines we want to focus on 
-            if (strcmp(key, "MemTotal:") == 0 ||
-                strcmp(key, "MemFree:") == 0 ||
-                strcmp(key, "MemAvailable:") == 0 ||
-                strcmp(key, "SwapTotal:") == 0 ||
-                strcmp(key, "SwapFree:") == 0)
-            {
-                // Write the data
-                fprintf(output, "%s %lu kB\n", key, value);
+            if (strcmp(key, "MemTotal:") == 0){
+                md.mem_total = value;
+            } else if (strcmp(key, "MemFree:") == 0){
+                md.mem_free = value;
+            } else if (strcmp(key, "MemAvailable:") == 0){
+                md.mem_avail = value;
+            } else if (strcmp(key, "SwapTotal:") == 0){
+                md.swap_total = value;
+            } else if (strcmp(key, "SwapFree:") == 0){
+                md.swap_free = value;
             }
+
         }
+        write(STDOUT_FILENO, &md, sizeof(md));
 
         // Clean up
         fclose(input);
-        fclose(output);
 
         sleep(INTERVAL);
     }
