@@ -1,13 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h> 
 #include <unistd.h>
 #include <dirent.h>
 #include <regex.h>
 
-#include "config.h"
-#include "sensor_utils.h"
+
+#include <config.h>
+#include <sysmon_ipc.h>
 
 #define PROCFS_PATH   "/proc"
+
+ProcData pd;
 
 int main(void) {
     regex_t regex;
@@ -39,9 +43,11 @@ int main(void) {
         closedir(dir);
 
         
-        // Write process count
-        // fprintf(output, "Processes: %d\n", process_count);
+        pd.total_procs = process_count;
+        fprintf(stderr, "total_procs isisii: %d\n", pd.total_procs);
 
+        int proc_fd = open(PROC_FIFO_PATH, O_WRONLY);
+        write(proc_fd, &pd, sizeof(pd));
         
         sleep(INTERVAL);
     }

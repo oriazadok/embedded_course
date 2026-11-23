@@ -129,7 +129,7 @@ int main(void) {
     
 
     int cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
-    int proc_fd = open(CPU_FIFO_PATH, O_RDONLY);
+    int proc_fd = open(PROC_FIFO_PATH, O_RDONLY);
 
     while(1) {
         read(mem_fds[0], &md, sizeof(md));
@@ -140,6 +140,7 @@ int main(void) {
 
         printf("mem total: %ld\n", md.mem_total);
         printf("cpu load1 : %.2f\n", cd.load1);
+        printf("proc total : %d\n", pd.total_procs);
         sleep(INTERVAL);
     }
 
