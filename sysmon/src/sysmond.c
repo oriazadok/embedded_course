@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <config.h>
 #include <sysmon_ipc.h>
@@ -16,8 +18,9 @@ int mem_active = 1;
 int cpu_active = 1;
 int proc_active = 1;
 
-
-
+MemData md;
+CpuData cd;
+ProcData pd;
 
 
 // void signal_handler(int sig) {
@@ -61,14 +64,11 @@ int main(void) {
     // sa.sa_handler = signal_handler;
     // sigaction(SIGCHLD, &sa, NULL);
 
-    // const char *sensors[] = {
-    //     "./bin/mem_sensor",
-    //     "./bin/cpu_sensor",
-    //     "./bin/proc_sensor"
-    // };
-
     int mem_fds[2];
     pipe(mem_fds);
+
+    mkfifo(CPU_FIFO_PATH, 0666);
+    mkfifo(PROC_FIFO_PATH, 0666);
 
     pid_t pid_mem_fork = fork();
     if (pid_mem_fork < 0) {
@@ -76,33 +76,71 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    while(1) {
-        if (pid_mem_fork == 0) {
-    
-            close(mem_fds[0]);
-            dup2 (mem_fds[1], STDOUT_FILENO);
-            close(mem_fds[1]);
-    
-            // Child executes its sensor
-            execl("./bin/mem_sensor", "./bin/mem_sensor", (char *)NULL);
-    
-            // Only reached if execl fails
-            perror("execl");
-            exit(EXIT_FAILURE);
-        } else {
-            close(mem_fds[1]);
-    
-            MemData md;
-            read(mem_fds[0], &md, sizeof(md));
+    if (pid_mem_fork == 0) {
+
+        close(mem_fds[0]);
+        dup2 (mem_fds[1], STDOUT_FILENO);
+        close(mem_fds[1]);
+
+        // Child executes its sensor
+        execl("./bin/mem_sensor", "./bin/mem_sensor", (char *)NULL);
+
+        // Only reached if execl fails
+        perror("execl");
+        exit(EXIT_FAILURE);
+    } else {
+        close(mem_fds[1]);
+    }
+
+
+    pid_t pid_cpu_fork = fork();
+    if (pid_cpu_fork < 0) {
+        perror("fork");
+        return EXIT_FAILURE;
+    }
+
+    if (pid_cpu_fork == 0) {
+
+        // Child executes its sensor
+        execl("./bin/cpu_sensor", "./bin/cpu_sensor", (char *)NULL);
+
+        // Only reached if execl fails
+        perror("execl");
+        exit(EXIT_FAILURE);
+    }
+
+    pid_t pid_proc_fork = fork();
+    if (pid_proc_fork < 0) {
+        perror("fork");
+        return EXIT_FAILURE;
+    }
+
+    if (pid_proc_fork == 0) {
+
+        // Child executes its sensor
+        execl("./bin/proc_sensor", "./bin/proc_sensor", (char *)NULL);
+
+        // Only reached if execl fails
+        perror("execl");
+        exit(EXIT_FAILURE);
+    }
+
 
     
-            printf("mem total: %ld\n", md.mem_total);
-            sleep(INTERVAL);
-    
-            /* Wait for the child process to finish.  */
-            // waitpid (mem_pid, NULL, 0);
-    
-        }
+
+    int cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
+    int proc_fd = open(CPU_FIFO_PATH, O_RDONLY);
+
+    while(1) {
+        read(mem_fds[0], &md, sizeof(md));
+
+        read(cpu_fd, &cd, sizeof(cd));
+        read(proc_fd, &pd, sizeof(pd));
+
+
+        printf("mem total: %ld\n", md.mem_total);
+        printf("cpu load1 : %.2f\n", cd.load1);
+        sleep(INTERVAL);
     }
 
 

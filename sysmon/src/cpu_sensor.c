@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h> 
 #include <unistd.h>
 
-#include "config.h"
-#include "sensor_utils.h"
+#include <config.h>
+#include <sysmon_ipc.h>
 
 #define CPUINFO_PATH "/proc/loadavg"
+
+CpuData cd;
 
 int main(void) {
     double load1, load5, load15;
@@ -26,10 +29,12 @@ int main(void) {
             return EXIT_FAILURE;
         }
 
-        // Write CPU load averages
-        // fprintf(output, "Load1: %.2f\n", load1);
-        // fprintf(output, "Load5: %.2f\n", load5);
-        // fprintf(output, "Load15: %.2f\n", load15);
+        cd.load1 = load1;
+        cd.load5 = load5;
+        cd.load15 = load15;
+
+        int cpu_fd = open(CPU_FIFO_PATH, O_WRONLY);
+        write(cpu_fd, &cd, sizeof(cd));
         
         // Clean up
         fclose(input);
