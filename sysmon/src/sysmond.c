@@ -31,24 +31,33 @@ ProcData pd;
 //     }
 // }
 
-// void print_file(const char *path) {
+void print_dashboard() {
+    printf("\033[2J\033[H");
 
-//     char buffer[256];
+    printf("=================================\n");
+    printf("       SYSTEM MONITOR REPORT     \n");
+    printf("=================================\n");
 
-//     // Open the data file 
-//     FILE *file = fopen(path, "r");
-//     if (file == NULL) {
-//         perror(path);
-//         return;
-//     }
+    printf("\n[MEMORY]\n");
+    printf("  Total:      %ld KB\n", md.mem_total);
+    printf("  Free:       %ld KB\n", md.mem_free );
+    printf("  Available:  %ld KB\n", md.mem_avail);
+    printf("  Swap total: %ld KB\n", md.swap_total);
+    printf("  Swap free:  %ld KB\n", md.swap_free);
 
-//     // Read and print the file line by line
-//     while (fgets(buffer, sizeof(buffer), file) != NULL) {
-//         printf("%s", buffer);
-//     }
+    printf("\n[CPU LOAD]\n");
+    printf("  1 min:  %.2f\n", cd.load1);
+    printf("  5 min:  %.2f\n", cd.load5);
+    printf("  15 min: %.2f\n", cd.load15);
 
-//     fclose(file);
-// }
+    printf("\n[PROCESSES]\n");
+    printf("  Total:  %d\n", pd.total_procs);
+
+    printf("\n=================================\n");
+    printf("Press Ctrl+C to stop\n");
+
+    fflush(stdout);
+}
 
 int main(void) {
 
@@ -130,56 +139,12 @@ int main(void) {
 
     while(1) {
         read(mem_fds[0], &md, sizeof(md));
-
         read(cpu_fd, &cd, sizeof(cd));
         read(proc_fd, &pd, sizeof(pd));
 
-
-        printf("mem total: %ld\n", md.mem_total);
-        printf("cpu load1 : %.2f\n", cd.load1);
-        printf("proc total : %d\n", pd.total_procs);
+        print_dashboard();
         sleep(INTERVAL);
     }
-
-
-    // Parent process prints the reports
-    // sleep(INTERVAL);
-    // while (1) {
-    //     printf("\n=================================\n");
-    //     printf("       SYSTEM MONITOR REPORT     \n");
-    //     printf("=================================\n");
-
-        // printf("\n[MEMORY]\n");
-        // if (mem_active) {
-        //     print_file(MEM_PATH);
-        // } else {
-        //     printf("Memory sensor unavailable\n");
-        // }
-
-        // printf("\n[CPU LOAD]\n");
-        // if (cpu_active) {
-        //     print_file(CPU_PATH);
-        // } else {
-        //     printf("CPU sensor unavailable\n");
-        // }
-
-        // printf("\n[PROCESSES]\n");
-        // if (proc_active) {
-        //     print_file(PROC_PATH);
-        // } else {
-        //     printf("Proc sensor unavailable\n");
-        // }
-
-        // printf("\n=================================\n");
-
-        // fflush(stdout);
-
-        // sleep(INTERVAL);
-
-        // if(!mem_active && !cpu_active && !proc_active) {
-        //     break;
-        // }
-    // }
 
     return 0;
 }
