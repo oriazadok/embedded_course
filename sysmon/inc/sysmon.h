@@ -1,3 +1,9 @@
+#ifndef SYSMON_H
+#define SYSMON_H
+
+#include <pthread.h>
+#include <signal.h>
+
 typedef struct {
     // Memory Metrics
     long mem_total;
@@ -19,3 +25,8 @@ typedef struct {
     pthread_cond_t alert_cond;
 } SystemState;
 
+extern SystemState sys_state;
+
+extern volatile sig_atomic_t running;
+
+#endif

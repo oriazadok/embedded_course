@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -Wall -g -Iinc -pthread
 
 TARGETS = bin/sysmond
-
+HEADERS = $(wildcard inc/*.h)
 OBJECTS = src/sysmond.o src/mem_sensor.o src/cpu_sensor.o src/proc_sensor.o
 
 all: bin $(OBJECTS) $(TARGETS)
@@ -11,7 +11,7 @@ all: bin $(OBJECTS) $(TARGETS)
 bin:
 	mkdir -p bin
 
-src/%.o: src/%.c
+src/%.o: src/%.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 bin/sysmond: $(OBJECTS)

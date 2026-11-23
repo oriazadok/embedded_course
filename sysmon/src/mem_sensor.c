@@ -2,21 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <pthread.h>
 
 #include <config.h>
 #include <sysmon.h>
 
 #define MEMINFO_PATH "/proc/meminfo"
 
-extern SystemState sys_state;
-
 void* mem_sensor(void *arg) {
     char line[256];
     char key[64];
     unsigned long value;
 
-    while (1) {
+    while (running) {
 
         // Open the mem info file
         FILE *input = fopen(MEMINFO_PATH, "r");

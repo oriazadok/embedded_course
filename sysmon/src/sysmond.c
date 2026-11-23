@@ -10,11 +10,19 @@
 
 SystemState sys_state;
 
+volatile sig_atomic_t running = 1;
+
+void handle_sigint(int sig) {
+    running = 0;
+}
+
 void print_sys_state() {
 
     pthread_mutex_lock(&sys_state.lock);
 
-    printf("\n=================================\n");
+    printf("\033[2J\033[H");
+
+    printf("=================================\n");
     printf("       SYSTEM MONITOR REPORT     \n");
     printf("=================================\n");
 
@@ -44,8 +52,11 @@ void print_sys_state() {
 void* alert(void *arg) {
     pthread_mutex_lock(&sys_state.lock);
 
-    while (1) {
+    while (running) {
         pthread_cond_wait(&sys_state.alert_cond, &sys_state.lock); /* unlocks, sleeps, relocks */
+        if(!running) {
+            break;
+        }
         fprintf(stderr, "[ALERT]: load is: %f\n", sys_state.load1);
     }
 
@@ -64,6 +75,7 @@ int main(void) {
     pthread_mutex_init(&sys_state.lock, NULL);
     pthread_cond_init(&sys_state.alert_cond, NULL);
 
+    signal(SIGINT, handle_sigint);
 
     // Create the sensor threads
     if (pthread_create(&mem_thread, NULL, mem_sensor, NULL) != 0) {
@@ -87,16 +99,23 @@ int main(void) {
     }
 
     // Parent process prints the reports
-    while (1) {
+    while (running) {
         sleep(DISPLAY_INTERVAL);
         print_sys_state();
     }
+
+    pthread_mutex_lock(&sys_state.lock);
+    pthread_cond_signal(&sys_state.alert_cond);
+    pthread_mutex_unlock(&sys_state.lock);
 
     // Wait for sensor threads to finish
     pthread_join(mem_thread, NULL);
     pthread_join(cpu_thread, NULL);
     pthread_join(proc_thread, NULL);
     pthread_join(alert_thread, NULL);
+
+    pthread_mutex_destroy(&sys_state.lock);
+    pthread_cond_destroy(&sys_state.alert_cond);
 
     return 0;
 }

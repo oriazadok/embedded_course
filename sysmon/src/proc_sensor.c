@@ -3,15 +3,11 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <regex.h>
-#include <pthread.h>
 
 #include <config.h>
 #include <sysmon.h>
 
 #define PROCFS_PATH   "/proc"
-
-extern SystemState sys_state;
-
 
 void* proc_sensor(void *arg) {
     regex_t regex;
@@ -22,7 +18,7 @@ void* proc_sensor(void *arg) {
         return NULL;
     }
 
-    while (1) {
+    while (running) {
 
         // Open /proc directory
         DIR *dir = opendir(PROCFS_PATH);

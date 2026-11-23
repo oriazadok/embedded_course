@@ -1,19 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <pthread.h>
 
 #include <config.h>
 #include <sysmon.h>
 
 #define CPUINFO_PATH "/proc/loadavg"
 
-extern SystemState sys_state;
-
 void* cpu_sensor(void *arg) {
     double load1, load5, load15;
 
-    while (1) {
+    while (running) {
 
         // Open the cpu info file
         FILE *input = fopen(CPUINFO_PATH, "r");
