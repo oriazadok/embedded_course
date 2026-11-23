@@ -5,7 +5,7 @@ CPPFLAGS = -I. -Iinc
 
 TARGETS = bin/sysmond bin/mem_sensor bin/cpu_sensor bin/proc_sensor
 
-OBJECTS = src/sysmond.o src/mem_sensor.o src/cpu_sensor.o src/proc_sensor.o src/sensor_utils.o
+OBJECTS = src/sysmond.o src/mem_sensor.o src/cpu_sensor.o src/proc_sensor.o
 
 all: bin $(OBJECTS) $(TARGETS)
 
@@ -15,7 +15,7 @@ bin:
 src/%.o: src/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-bin/%: src/%.o src/sensor_utils.o
+bin/%: src/%.o
 	$(CC) $^ -o $@
 
 clean:

@@ -10,14 +10,6 @@
 #include <config.h>
 #include <sysmon_ipc.h>
 
-pid_t mem_pid = -1;
-pid_t cpu_pid = -1;
-pid_t proc_pid = -1;
-
-int mem_active = 1;
-int cpu_active = 1;
-int proc_active = 1;
-
 MemData md;
 CpuData cd;
 ProcData pd;
@@ -69,6 +61,7 @@ int main(void) {
 
     mkfifo(CPU_FIFO_PATH, 0666);
     mkfifo(PROC_FIFO_PATH, 0666);
+
 
     pid_t pid_mem_fork = fork();
     if (pid_mem_fork < 0) {
@@ -144,35 +137,6 @@ int main(void) {
         sleep(INTERVAL);
     }
 
-
-
-
-    // // Create 3 child processes
-    // for (int i = 0; i < 3; i++) {
-    //     pid_t pid = fork();
-
-    //     if (pid < 0) {
-    //         perror("fork");
-    //         return EXIT_FAILURE;
-    //     }
-
-    //     if (pid == 0) {
-    //         // Child executes its sensor
-    //         execl(sensors[i], sensors[i], (char *)NULL);
-
-    //         // Only reached if execl fails
-    //         perror("execl");
-    //         _exit(EXIT_FAILURE);
-    //     }
-
-    //     if (i == 0) {
-    //         mem_pid = pid;
-    //     } else if (i == 1) {
-    //         cpu_pid = pid;
-    //     } else if (i == 2) {
-    //         proc_pid = pid;
-    //     }
-    // }
 
     // Parent process prints the reports
     // sleep(INTERVAL);

@@ -9,7 +9,7 @@
 #include <config.h>
 #include <sysmon_ipc.h>
 
-#define PROCFS_PATH   "/proc"
+#define PROCFS_PATH "/proc"
 
 ProcData pd;
 
