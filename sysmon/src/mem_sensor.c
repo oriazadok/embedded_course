@@ -2,21 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
-#include "config.h"
-#include "sensor_utils.h"
+#include <config.h>
+#include <sysmon.h>
 
 #define MEMINFO_PATH "/proc/meminfo"
+
+extern SystemState sys_state;
 
 void* mem_sensor(void *arg) {
     char line[256];
     char key[64];
     unsigned long value;
-
-    // Ensure the output directory exist
-    if (ensure_data_directory() != 0) {
-        return NULL;
-    }
 
     while (1) {
 
@@ -27,16 +25,7 @@ void* mem_sensor(void *arg) {
             return NULL;
         }
 
-        // Lock the output file so sysmond can't read it while we rewrite it
-        pthread_mutex_lock(&mem_lock);
-
-        FILE *output = fopen(MEM_PATH, "w");
-        if (output == NULL) {
-            perror("fopen output");
-            pthread_mutex_unlock(&mem_lock);
-            fclose(input);
-            return NULL;
-        }
+        pthread_mutex_lock(&sys_state.lock);
 
         // Read /proc/meminfo line by line
         while (fgets(line, sizeof(line), input) != NULL) {
@@ -46,21 +35,21 @@ void* mem_sensor(void *arg) {
                 continue;
             }
 
-            // Write the lines we want to focus on
-            if (strcmp(key, "MemTotal:") == 0 ||
-                strcmp(key, "MemFree:") == 0 ||
-                strcmp(key, "MemAvailable:") == 0 ||
-                strcmp(key, "SwapTotal:") == 0 ||
-                strcmp(key, "SwapFree:") == 0)
-            {
-                // Write the data
-                fprintf(output, "%s %lu kB\n", key, value);
+            if (strcmp(key, "MemTotal:") == 0){
+                sys_state.mem_total = value;
+            } else if (strcmp(key, "MemFree:") == 0){
+                sys_state.mem_free = value;
+            } else if (strcmp(key, "MemAvailable:") == 0){
+                sys_state.mem_avail = value;
+            } else if (strcmp(key, "SwapTotal:") == 0){
+                sys_state.swap_total = value;
+            } else if (strcmp(key, "SwapFree:") == 0){
+                sys_state.swap_free = value;
             }
+
         }
 
-        fclose(output);
-
-        pthread_mutex_unlock(&mem_lock);
+        pthread_mutex_unlock(&sys_state.lock);
 
         fclose(input);
 

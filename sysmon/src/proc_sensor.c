@@ -3,19 +3,18 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <regex.h>
+#include <pthread.h>
 
-#include "config.h"
-#include "sensor_utils.h"
+#include <config.h>
+#include <sysmon.h>
 
 #define PROCFS_PATH   "/proc"
 
+extern SystemState sys_state;
+
+
 void* proc_sensor(void *arg) {
     regex_t regex;
-
-    // Ensure the output directory exist
-    if (ensure_data_directory() != 0) {
-        return NULL;
-    }
 
     // Compile regex to match numeric directories names
     if(regcomp(&regex, "^[0-9]+$", REG_EXTENDED) != 0) {
@@ -43,22 +42,11 @@ void* proc_sensor(void *arg) {
 
         closedir(dir);
 
-        // Lock the output file so sysmond can't read it while we rewrite it
-        pthread_mutex_lock(&proc_lock);
+        pthread_mutex_lock(&sys_state.lock);
 
-        FILE *output = fopen(PROC_PATH, "w");
-        if (output == NULL) {
-            perror("fopen output");
-            pthread_mutex_unlock(&proc_lock);
-            break;
-        }
+        sys_state.total_procs = process_count;
 
-        // Write process count
-        fprintf(output, "Processes: %d\n", process_count);
-
-        fclose(output);
-
-        pthread_mutex_unlock(&proc_lock);
+        pthread_mutex_unlock(&sys_state.lock);
 
         sleep(INTERVAL);
     }

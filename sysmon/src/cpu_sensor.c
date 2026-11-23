@@ -1,19 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <pthread.h>
 
-#include "config.h"
-#include "sensor_utils.h"
+#include <config.h>
+#include <sysmon.h>
 
 #define CPUINFO_PATH "/proc/loadavg"
 
+extern SystemState sys_state;
+
 void* cpu_sensor(void *arg) {
     double load1, load5, load15;
-
-    // Ensure the output directory exist
-    if (ensure_data_directory() != 0) {
-        return NULL;
-    }
 
     while (1) {
 
@@ -24,7 +22,7 @@ void* cpu_sensor(void *arg) {
             return NULL;
         }
 
-        // Read CPU load averages (no lock needed, we only touch our own variables)
+        // Read CPU load averages
         if (fscanf(input, "%lf %lf %lf", &load1, &load5, &load15) != 3) {
             fprintf(stderr, "Failed to parse CPU load averages\n");
             fclose(input);
@@ -32,24 +30,17 @@ void* cpu_sensor(void *arg) {
         }
         fclose(input);
 
-        // Lock the output file so sysmond can't read it while we rewrite it
-        pthread_mutex_lock(&cpu_lock);
+        pthread_mutex_lock(&sys_state.lock);
 
-        FILE *output = fopen(CPU_PATH, "w");
-        if (output == NULL) {
-            perror("fopen output");
-            pthread_mutex_unlock(&cpu_lock);
-            return NULL;
+        sys_state.load1 = load1;
+        sys_state.load5 = load5;
+        sys_state.load15 = load15;
+
+        if(sys_state.load1 > LOAD_THRESHOLD) {
+            pthread_cond_signal(&sys_state.alert_cond);
         }
 
-        // Write CPU load averages
-        fprintf(output, "Load1: %.2f\n", load1);
-        fprintf(output, "Load5: %.2f\n", load5);
-        fprintf(output, "Load15: %.2f\n", load15);
-
-        fclose(output);
-
-        pthread_mutex_unlock(&cpu_lock);
+        pthread_mutex_unlock(&sys_state.lock);
 
         sleep(INTERVAL);
     }
