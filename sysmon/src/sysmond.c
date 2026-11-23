@@ -75,11 +75,13 @@ int main(void) {
         dup2 (mem_fds[1], STDOUT_FILENO);
         close(mem_fds[1]);
 
+        char *argv[] = {"./bin/mem_sensor", NULL};
+
         // Child executes its sensor
-        execl("./bin/mem_sensor", "./bin/mem_sensor", (char *)NULL);
+        execve("./bin/mem_sensor", argv, NULL);
 
         // Only reached if execl fails
-        perror("execl");
+        perror("execve");
         exit(EXIT_FAILURE);
     } else {
         close(mem_fds[1]);
@@ -94,11 +96,13 @@ int main(void) {
 
     if (pid_cpu_fork == 0) {
 
+        char *argv[] = {"./bin/cpu_sensor", NULL};
+
         // Child executes its sensor
-        execl("./bin/cpu_sensor", "./bin/cpu_sensor", (char *)NULL);
+        execve("./bin/cpu_sensor", argv, NULL);
 
         // Only reached if execl fails
-        perror("execl");
+        perror("execve");
         exit(EXIT_FAILURE);
     }
 
@@ -110,16 +114,15 @@ int main(void) {
 
     if (pid_proc_fork == 0) {
 
+        char *argv[] = {"./bin/proc_sensor", NULL};
+
         // Child executes its sensor
-        execl("./bin/proc_sensor", "./bin/proc_sensor", (char *)NULL);
+        execve("./bin/proc_sensor", argv, NULL);
 
         // Only reached if execl fails
-        perror("execl");
+        perror("execve");
         exit(EXIT_FAILURE);
     }
-
-
-    
 
     int cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
     int proc_fd = open(PROC_FIFO_PATH, O_RDONLY);
