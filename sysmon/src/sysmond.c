@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #include <config.h>
 #include <sysmon_ipc.h>
@@ -14,22 +15,34 @@ MemData md;
 CpuData cd;
 ProcData pd;
 
+static pid_t mem_pid = -1;
+static pid_t cpu_pid = -1;
+static pid_t proc_pid = -1;
 
-// void signal_handler(int sig) {
+static int mem_fd = -1;
+static int cpu_fd = -1;
+static int proc_fd = -1;
 
-//     pid_t pid;
-//     int status;
 
-//     while((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-//         if(pid == mem_pid) {
-//             mem_active = 0;
-//         } else if(pid == cpu_pid) {
-//             cpu_active = 0;
-//         } else if(pid == proc_pid) {
-//             proc_active = 0;
-//         }
-//     }
-// }
+void handle_shutdown(int sig) {
+
+    if(mem_pid > 0) { kill(mem_pid, SIGTERM); }
+    if(cpu_pid > 0) { kill(cpu_pid, SIGTERM); }
+    if(proc_pid > 0) { kill(proc_pid, SIGTERM); }
+
+    if(mem_pid > 0) { waitpid(mem_pid, NULL, 0); }
+    if(cpu_pid > 0) { waitpid(cpu_pid, NULL, 0); }
+    if(proc_pid > 0) { waitpid(proc_pid, NULL, 0); }
+
+    if(mem_fd != -1) { close(mem_fd); }
+    if(cpu_fd != -1) { close(cpu_fd); }
+    if(proc_fd != -1) { close(proc_fd); }
+       
+    unlink(CPU_FIFO_PATH);
+    unlink(PROC_FIFO_PATH);
+
+    _exit(0);
+}
 
 void print_dashboard() {
     printf("\033[2J\033[H");
@@ -61,24 +74,33 @@ void print_dashboard() {
 
 int main(void) {
 
-    // struct sigaction sa;
-    // sa.sa_handler = signal_handler;
-    // sigaction(SIGCHLD, &sa, NULL);
+    struct sigaction sa = { 0 };
+    sa.sa_handler = handle_shutdown;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
 
     int mem_fds[2];
-    pipe(mem_fds);
+    if(pipe(mem_fds) == -1) {
+        perror("pipe");
+        return EXIT_FAILURE;
+    }
 
-    mkfifo(CPU_FIFO_PATH, 0666);
-    mkfifo(PROC_FIFO_PATH, 0666);
+    if(mkfifo(CPU_FIFO_PATH, 0666) == -1 && errno != EEXIST) {
+        perror("mkfifo cpu");
+    }
+    if(mkfifo(PROC_FIFO_PATH, 0666) == -1 && errno != EEXIST) {
+        perror("mkfifo proc");
+    }
 
 
-    pid_t pid_mem_fork = fork();
-    if (pid_mem_fork < 0) {
+    // Mem sensor
+    mem_pid = fork();
+    if (mem_pid < 0) {
         perror("fork");
         return EXIT_FAILURE;
     }
 
-    if (pid_mem_fork == 0) {
+    if (mem_pid == 0) {
 
         close(mem_fds[0]);
 
@@ -86,56 +108,62 @@ int main(void) {
         snprintf(fd_mem_str, sizeof(fd_mem_str), "%d", mem_fds[1]);
 
         char *argv[] = {"./bin/mem_sensor", fd_mem_str, NULL};
-
-        // Child executes its sensor
         execve("./bin/mem_sensor", argv, NULL);
 
         // Only reached if execl fails
-        perror("execve");
+        perror("execve mem sensor");
         exit(EXIT_FAILURE);
     } else {
         close(mem_fds[1]);
+        mem_fd = mem_fds[0];
     }
 
 
-    pid_t pid_cpu_fork = fork();
-    if (pid_cpu_fork < 0) {
+    // CPU sensor
+    cpu_pid = fork();
+    if (cpu_pid < 0) {
         perror("fork");
         return EXIT_FAILURE;
     }
 
-    if (pid_cpu_fork == 0) {
+    if (cpu_pid == 0) {
+
+        close(mem_fd);
 
         char *argv[] = {"./bin/cpu_sensor", NULL};
-
-        // Child executes its sensor
         execve("./bin/cpu_sensor", argv, NULL);
 
         // Only reached if execl fails
-        perror("execve");
+        perror("execve cpu sensor");
         exit(EXIT_FAILURE);
     }
 
-    pid_t pid_proc_fork = fork();
-    if (pid_proc_fork < 0) {
+    // Proc
+    proc_pid = fork();
+    if (proc_pid < 0) {
         perror("fork");
         return EXIT_FAILURE;
     }
 
-    if (pid_proc_fork == 0) {
+    if (proc_pid == 0) {
+
+        close(mem_fd);
 
         char *argv[] = {"./bin/proc_sensor", NULL};
-
-        // Child executes its sensor
         execve("./bin/proc_sensor", argv, NULL);
 
         // Only reached if execl fails
-        perror("execve");
+        perror("execve proc sensor");
         exit(EXIT_FAILURE);
     }
 
-    int cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
-    int proc_fd = open(PROC_FIFO_PATH, O_RDONLY);
+    cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
+    proc_fd = open(PROC_FIFO_PATH, O_RDONLY);
+    if (cpu_fd == -1 || proc_fd == -1) {
+        perror("open fifo");
+        handle_shutdown(0);
+    }
+
 
     while(1) {
         read(mem_fds[0], &md, sizeof(md));
@@ -143,7 +171,6 @@ int main(void) {
         read(proc_fd, &pd, sizeof(pd));
 
         print_dashboard();
-        sleep(INTERVAL);
     }
 
     return 0;

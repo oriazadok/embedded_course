@@ -20,6 +20,8 @@ int main(void) {
         fprintf(stderr, "Failed to compile regex\n");
         return EXIT_FAILURE;
     }
+    
+    int proc_fd = open(PROC_FIFO_PATH, O_WRONLY);
 
     while (1) {
 
@@ -44,12 +46,12 @@ int main(void) {
         
         pd.total_procs = process_count;
 
-        int proc_fd = open(PROC_FIFO_PATH, O_WRONLY);
         write(proc_fd, &pd, sizeof(pd));
-        close(proc_fd);
-        
+
         sleep(INTERVAL);
     }
+
+    close(proc_fd);
 
     // Release regex resources
     regfree(&regex);

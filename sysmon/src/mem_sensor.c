@@ -17,14 +17,14 @@ int main(int argc, char *argv[]) {
     char key[64];
     unsigned long value;
 
-    // Open the mem info file
-    FILE *input = fopen(MEMINFO_PATH, "r");
-    if (input == NULL) {
-        perror("fopen meminfo");
-        return EXIT_FAILURE;
-    }
-
+    
     while (1) {
+        // Open the mem info file
+        FILE *input = fopen(MEMINFO_PATH, "r");
+        if (input == NULL) {
+            perror("fopen meminfo");
+            return EXIT_FAILURE;
+        }
 
         // Read /proc/meminfo line by line
         while (fgets(line, sizeof(line), input) != NULL) {
@@ -47,13 +47,14 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        // Clean up
+        fclose(input);
+
         write(fd, &md, sizeof(md));
-        
+
         sleep(INTERVAL);
     }
 
-    // Clean up
-    fclose(input);
 
     return 0;
 }
