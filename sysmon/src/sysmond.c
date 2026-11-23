@@ -110,7 +110,7 @@ int main(void) {
         char *argv[] = {"./bin/mem_sensor", fd_mem_str, NULL};
         execve("./bin/mem_sensor", argv, NULL);
 
-        // Only reached if execl fails
+        // Only reached if execve fails
         perror("execve mem sensor");
         exit(EXIT_FAILURE);
     } else {
@@ -133,7 +133,7 @@ int main(void) {
         char *argv[] = {"./bin/cpu_sensor", NULL};
         execve("./bin/cpu_sensor", argv, NULL);
 
-        // Only reached if execl fails
+        // Only reached if execve fails
         perror("execve cpu sensor");
         exit(EXIT_FAILURE);
     }
@@ -152,7 +152,7 @@ int main(void) {
         char *argv[] = {"./bin/proc_sensor", NULL};
         execve("./bin/proc_sensor", argv, NULL);
 
-        // Only reached if execl fails
+        // Only reached if execve fails
         perror("execve proc sensor");
         exit(EXIT_FAILURE);
     }
