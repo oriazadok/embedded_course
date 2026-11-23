@@ -10,7 +10,9 @@
 
 MemData md;
 
-int main(void) {
+int main(int argc, char *argv[]) {
+
+    int fd = argc == 2 ? atoi(argv[1]) : STDOUT_FILENO;
     char line[256];
     char key[64];
     unsigned long value;
@@ -45,7 +47,7 @@ int main(void) {
             }
         }
 
-        write(STDOUT_FILENO, &md, sizeof(md));
+        write(fd, &md, sizeof(md));
         
         sleep(INTERVAL);
     }

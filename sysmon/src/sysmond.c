@@ -72,10 +72,11 @@ int main(void) {
     if (pid_mem_fork == 0) {
 
         close(mem_fds[0]);
-        dup2 (mem_fds[1], STDOUT_FILENO);
-        close(mem_fds[1]);
 
-        char *argv[] = {"./bin/mem_sensor", NULL};
+        char fd_mem_str[16];
+        snprintf(fd_mem_str, sizeof(fd_mem_str), "%d", mem_fds[1]);
+
+        char *argv[] = {"./bin/mem_sensor", fd_mem_str, NULL};
 
         // Child executes its sensor
         execve("./bin/mem_sensor", argv, NULL);
