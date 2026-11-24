@@ -14,8 +14,6 @@
 
 int running = 1;
 
-
-int mem_fds[2];
 MemData md;
 CpuData cd;
 ProcData pd;
@@ -24,6 +22,7 @@ static pid_t mem_pid = -1;
 static pid_t cpu_pid = -1;
 static pid_t proc_pid = -1;
 
+int mem_fds[2];
 static int mem_fd = -1;
 static int cpu_fd = -1;
 static int proc_fd = -1;
@@ -80,18 +79,19 @@ void print_dashboard() {
     fflush(stdout);
 }
 
+void notify_main() {
+    pthread_mutex_lock(&lock);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&lock);
+}
 
 void* mem_reading(void* arg) {
     while (running) {
         read(mem_fds[0], &md, sizeof(md));
-        pthread_mutex_lock(&lock);
-        pthread_cond_signal(&cond);
-        pthread_mutex_unlock(&lock);
+        notify_main();
     }
 
-    pthread_mutex_lock(&lock);
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&lock);
+    notify_main();
     
     return NULL;
 }
@@ -99,14 +99,10 @@ void* mem_reading(void* arg) {
 void* cpu_reading(void* arg) {
     while (running) {
         read(cpu_fd, &cd, sizeof(cd));
-        pthread_mutex_lock(&lock);
-        pthread_cond_signal(&cond);
-        pthread_mutex_unlock(&lock);
+        notify_main();
     }
 
-    pthread_mutex_lock(&lock);
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&lock);
+    notify_main();
     
     return NULL;
 }
@@ -114,14 +110,10 @@ void* cpu_reading(void* arg) {
 void* proc_reading(void* arg) {
     while (running) {
         read(proc_fd, &pd, sizeof(pd));
-        pthread_mutex_lock(&lock);
-        pthread_cond_signal(&cond);
-        pthread_mutex_unlock(&lock);
+        notify_main();
     }
 
-    pthread_mutex_lock(&lock);
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&lock);
+    notify_main();
     
     return NULL;
 }
@@ -215,7 +207,6 @@ int main(void) {
         handle_shutdown(0);
     }
 
-
     pthread_t mem_read;
     pthread_t cpu_read;
     pthread_t proc_read;
@@ -226,13 +217,10 @@ int main(void) {
 
     pthread_mutex_lock(&lock);
     while(running) {
-        
         pthread_cond_wait(&cond, &lock);
-        
         print_dashboard();
     }
     pthread_mutex_unlock(&lock);
-
 
     pthread_join(mem_read, NULL);
     pthread_join(cpu_read, NULL);
