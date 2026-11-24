@@ -38,7 +38,7 @@ int main(void) {
         
         write(cpu_fd, &cd, sizeof(cd));
 
-        sleep(INTERVAL);
+        sleep(CPU_INTERVAL);
     }
 
     close(cpu_fd);

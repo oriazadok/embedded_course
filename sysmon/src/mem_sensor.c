@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
 
         write(fd, &md, sizeof(md));
 
-        sleep(INTERVAL);
+        sleep(MEM_INTERVAL);
     }
 
 

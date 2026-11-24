@@ -48,7 +48,7 @@ int main(void) {
 
         write(proc_fd, &pd, sizeof(pd));
 
-        sleep(INTERVAL);
+        sleep(PROC_INTERVAL);
     }
 
     close(proc_fd);

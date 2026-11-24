@@ -7,10 +7,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include <config.h>
 #include <sysmon_ipc.h>
 
+int running = 1;
+
+
+int mem_fds[2];
 MemData md;
 CpuData cd;
 ProcData pd;
@@ -23,8 +28,12 @@ static int mem_fd = -1;
 static int cpu_fd = -1;
 static int proc_fd = -1;
 
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
 
 void handle_shutdown(int sig) {
+    running = 0;
 
     if(mem_pid > 0) { kill(mem_pid, SIGTERM); }
     if(cpu_pid > 0) { kill(cpu_pid, SIGTERM); }
@@ -41,7 +50,6 @@ void handle_shutdown(int sig) {
     unlink(CPU_FIFO_PATH);
     unlink(PROC_FIFO_PATH);
 
-    _exit(0);
 }
 
 void print_dashboard() {
@@ -72,6 +80,52 @@ void print_dashboard() {
     fflush(stdout);
 }
 
+
+void* mem_reading(void* arg) {
+    while (running) {
+        read(mem_fds[0], &md, sizeof(md));
+        pthread_mutex_lock(&lock);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&lock);
+    }
+
+    pthread_mutex_lock(&lock);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&lock);
+    
+    return NULL;
+}
+
+void* cpu_reading(void* arg) {
+    while (running) {
+        read(cpu_fd, &cd, sizeof(cd));
+        pthread_mutex_lock(&lock);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&lock);
+    }
+
+    pthread_mutex_lock(&lock);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&lock);
+    
+    return NULL;
+}
+
+void* proc_reading(void* arg) {
+    while (running) {
+        read(proc_fd, &pd, sizeof(pd));
+        pthread_mutex_lock(&lock);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&lock);
+    }
+
+    pthread_mutex_lock(&lock);
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&lock);
+    
+    return NULL;
+}
+
 int main(void) {
 
     struct sigaction sa = { 0 };
@@ -79,7 +133,6 @@ int main(void) {
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
 
-    int mem_fds[2];
     if(pipe(mem_fds) == -1) {
         perror("pipe");
         return EXIT_FAILURE;
@@ -91,7 +144,6 @@ int main(void) {
     if(mkfifo(PROC_FIFO_PATH, 0666) == -1 && errno != EEXIST) {
         perror("mkfifo proc");
     }
-
 
     // Mem sensor
     mem_pid = fork();
@@ -117,7 +169,6 @@ int main(void) {
         close(mem_fds[1]);
         mem_fd = mem_fds[0];
     }
-
 
     // CPU sensor
     cpu_pid = fork();
@@ -165,13 +216,27 @@ int main(void) {
     }
 
 
-    while(1) {
-        read(mem_fds[0], &md, sizeof(md));
-        read(cpu_fd, &cd, sizeof(cd));
-        read(proc_fd, &pd, sizeof(pd));
+    pthread_t mem_read;
+    pthread_t cpu_read;
+    pthread_t proc_read;
 
+    pthread_create(&mem_read, NULL, mem_reading, NULL);
+    pthread_create(&cpu_read, NULL, cpu_reading, NULL);
+    pthread_create(&proc_read, NULL, proc_reading, NULL);
+
+    pthread_mutex_lock(&lock);
+    while(running) {
+        
+        pthread_cond_wait(&cond, &lock);
+        
         print_dashboard();
     }
+    pthread_mutex_unlock(&lock);
+
+
+    pthread_join(mem_read, NULL);
+    pthread_join(cpu_read, NULL);
+    pthread_join(proc_read, NULL);
 
     return 0;
 }
