@@ -31,7 +31,7 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 
-void handle_shutdown(int sig) {
+void handle_shutdown() {
     running = 0;
 
     if(mem_pid > 0) { kill(mem_pid, SIGTERM); }
@@ -85,7 +85,7 @@ void notify_main() {
     pthread_mutex_unlock(&lock);
 }
 
-void* mem_reading(void* arg) {
+void* mem_reading() {
     while (running) {
         read(mem_fds[0], &md, sizeof(md));
         notify_main();
@@ -96,7 +96,7 @@ void* mem_reading(void* arg) {
     return NULL;
 }
 
-void* cpu_reading(void* arg) {
+void* cpu_reading() {
     while (running) {
         read(cpu_fd, &cd, sizeof(cd));
         notify_main();
@@ -107,7 +107,7 @@ void* cpu_reading(void* arg) {
     return NULL;
 }
 
-void* proc_reading(void* arg) {
+void* proc_reading() {
     while (running) {
         read(proc_fd, &pd, sizeof(pd));
         notify_main();

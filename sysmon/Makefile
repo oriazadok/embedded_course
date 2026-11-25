@@ -1,6 +1,6 @@
 CC = gcc
 
-CFLAGS = -Wall -g -Iinc
+CFLAGS = -Wall -Wextra -Werror -g -Iinc
 
 TARGETS = bin/sysmond bin/mem_sensor bin/cpu_sensor bin/proc_sensor
 HEADERS = $(wildcard inc/*.h)
