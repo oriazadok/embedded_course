@@ -98,6 +98,34 @@ void log_add(char *sensor_name, int sensor_pid,int status, int counter) {
         sensor_name, sensor_pid, status, counter);
 }
 
+int create_mem_sensor() {
+    mem_pid = fork();
+    if (mem_pid < 0) {
+        perror("fork");
+        return EXIT_FAILURE;
+    }
+
+    if (mem_pid == 0) {
+
+        close(mem_fds[0]);
+
+        char fd_mem_str[16];
+        snprintf(fd_mem_str, sizeof(fd_mem_str), "%d", mem_fds[1]);
+
+        char *argv[] = {"./bin/mem_sensor", fd_mem_str, NULL};
+        execve("./bin/mem_sensor", argv, NULL);
+
+        // Only reached if execve fails
+        perror("execve mem sensor");
+        exit(EXIT_FAILURE);
+    } else {
+        close(mem_fds[1]);
+        mem_fd = mem_fds[0];
+    }
+
+    return 0;
+}
+
 
 int create_cpu_sensor() {
     cpu_pid = fork();
@@ -145,7 +173,19 @@ int create_proc_sensor() {
 
 void* mem_reading() {
     while (running) {
-        read(mem_fds[0], &md, sizeof(md));
+        if( read(mem_fds[0], &md, sizeof(md)) == 0) {
+            if(! running) {
+                break;
+            }
+            counter++;
+            log_add("mem_sensor", mem_pid, status, counter);
+            waitpid(mem_pid, &status, 0); 
+            if(pipe(mem_fds) == -1) {
+                perror("pipe");
+                break;
+            }
+            create_mem_sensor();
+        } 
         notify_main();
     }
 
@@ -214,29 +254,7 @@ int main(void) {
     }
 
     // Mem sensor
-    mem_pid = fork();
-    if (mem_pid < 0) {
-        perror("fork");
-        return EXIT_FAILURE;
-    }
-
-    if (mem_pid == 0) {
-
-        close(mem_fds[0]);
-
-        char fd_mem_str[16];
-        snprintf(fd_mem_str, sizeof(fd_mem_str), "%d", mem_fds[1]);
-
-        char *argv[] = {"./bin/mem_sensor", fd_mem_str, NULL};
-        execve("./bin/mem_sensor", argv, NULL);
-
-        // Only reached if execve fails
-        perror("execve mem sensor");
-        exit(EXIT_FAILURE);
-    } else {
-        close(mem_fds[1]);
-        mem_fd = mem_fds[0];
-    }
+    create_mem_sensor();
 
     // CPU sensor
     create_cpu_sensor();
