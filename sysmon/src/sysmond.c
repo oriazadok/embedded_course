@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string.h>
 #include <errno.h>
 #include <pthread.h>
 
@@ -34,7 +35,7 @@ static int proc_fd = -1;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
-char log_records;
+char logger[256] = { 0 };
 
 
 void handle_shutdown() {
@@ -91,13 +92,22 @@ void notify_main() {
     pthread_mutex_unlock(&lock);
 }
 
-void log_add(char *sensor_name, int sensor_pid,int status, int counter) {
+void print_log() {
 
-    char log[256];
-    snprintf(log, sizeof(log), "%s (pid: %d) exited with code %d, count: %d\n", 
+    if (logger[0] == '\0') {
+        return;
+    }
+
+    printf("[LOG]: %s\n", logger);
+
+}
+
+void log_add(char *sensor_name, int sensor_pid,int status, int counter) {
+    snprintf(logger, sizeof(logger), "%s (pid: %d) exited with code %d, count: %d\n", 
         sensor_name, sensor_pid, status, counter);
 }
 
+// Creation of sensors
 int create_mem_sensor() {
     mem_pid = fork();
     if (mem_pid < 0) {
@@ -125,7 +135,6 @@ int create_mem_sensor() {
 
     return 0;
 }
-
 
 int create_cpu_sensor() {
     cpu_pid = fork();
@@ -171,6 +180,7 @@ int create_proc_sensor() {
     return 0;
 }
 
+// Threads functions
 void* mem_reading() {
     while (running) {
         if( read(mem_fds[0], &md, sizeof(md)) == 0) {
@@ -180,6 +190,8 @@ void* mem_reading() {
             counter++;
             log_add("mem_sensor", mem_pid, status, counter);
             waitpid(mem_pid, &status, 0); 
+
+            close(mem_fds[0]);
             if(pipe(mem_fds) == -1) {
                 perror("pipe");
                 break;
@@ -204,7 +216,9 @@ void* cpu_reading() {
             log_add("cpu_sensor", cpu_pid, status, counter);
             waitpid(cpu_pid, &status, 0); 
             create_cpu_sensor();
+            int old_fd = cpu_fd;
             cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
+            close(old_fd);
         } 
         notify_main();
     }
@@ -224,7 +238,9 @@ void* proc_reading() {
             log_add("proc_sensor", proc_pid, status, counter);
             waitpid(proc_pid, &status, 0); 
             create_proc_sensor();
+            int old_fd = cpu_fd;
             proc_fd = open(PROC_FIFO_PATH, O_RDONLY);
+            close(old_fd);
         }
         notify_main();
     }
@@ -281,6 +297,7 @@ int main(void) {
     while(running) {
         pthread_cond_wait(&cond, &lock);
         print_dashboard();
+        print_log();
     }
     pthread_mutex_unlock(&lock);
 
