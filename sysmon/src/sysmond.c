@@ -136,6 +136,9 @@ void* mem_reading() {
 void* cpu_reading() {
     while (running) {
         if( read(cpu_fd, &cd, sizeof(cd)) == 0) {
+            if(! running) {
+                break;
+            }
             counter++;
             log_add("cpu_sensor", cpu_pid, status, counter);
             waitpid(cpu_pid, &status, 0); 
