@@ -100,7 +100,6 @@ void log_add(char *sensor_name, int sensor_pid,int status, int counter) {
 
 
 int create_cpu_sensor() {
-    // CPU sensor
     cpu_pid = fork();
     if (cpu_pid < 0) {
         perror("fork");
@@ -116,6 +115,28 @@ int create_cpu_sensor() {
 
         // Only reached if execve fails
         perror("execve cpu sensor");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+
+int create_proc_sensor() {
+    proc_pid = fork();
+    if (proc_pid < 0) {
+        perror("fork");
+        return EXIT_FAILURE;
+    }
+
+    if (proc_pid == 0) {
+
+        close(mem_fd);
+
+        char *argv[] = {"./bin/proc_sensor", NULL};
+        execve("./bin/proc_sensor", argv, NULL);
+
+        // Only reached if execve fails
+        perror("execve proc sensor");
         exit(EXIT_FAILURE);
     }
 
@@ -145,7 +166,6 @@ void* cpu_reading() {
             create_cpu_sensor();
             cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
         } 
-        printf("cdcc: %f\n", cd.load1);
         notify_main();
     }
 
@@ -156,7 +176,16 @@ void* cpu_reading() {
 
 void* proc_reading() {
     while (running) {
-        read(proc_fd, &pd, sizeof(pd));
+        if ( read(proc_fd, &pd, sizeof(pd)) == 0) {
+            if(! running) {
+                break;
+            }
+            counter++;
+            log_add("proc_sensor", proc_pid, status, counter);
+            waitpid(proc_pid, &status, 0); 
+            create_proc_sensor();
+            proc_fd = open(PROC_FIFO_PATH, O_RDONLY);
+        }
         notify_main();
     }
 
@@ -212,24 +241,8 @@ int main(void) {
     // CPU sensor
     create_cpu_sensor();
 
-    // Proc
-    proc_pid = fork();
-    if (proc_pid < 0) {
-        perror("fork");
-        return EXIT_FAILURE;
-    }
-
-    if (proc_pid == 0) {
-
-        close(mem_fd);
-
-        char *argv[] = {"./bin/proc_sensor", NULL};
-        execve("./bin/proc_sensor", argv, NULL);
-
-        // Only reached if execve fails
-        perror("execve proc sensor");
-        exit(EXIT_FAILURE);
-    }
+    // Proc sensor
+    create_proc_sensor();
 
     cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
     proc_fd = open(PROC_FIFO_PATH, O_RDONLY);
