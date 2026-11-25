@@ -18,6 +18,10 @@ MemData md;
 CpuData cd;
 ProcData pd;
 
+static __thread int status;
+static __thread int counter;
+
+
 static pid_t mem_pid = -1;
 static pid_t cpu_pid = -1;
 static pid_t proc_pid = -1;
@@ -29,6 +33,8 @@ static int proc_fd = -1;
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+char log_records;
 
 
 void handle_shutdown() {
@@ -85,6 +91,37 @@ void notify_main() {
     pthread_mutex_unlock(&lock);
 }
 
+void log_add(char *sensor_name, int sensor_pid,int status, int counter) {
+
+    char log[256];
+    snprintf(log, sizeof(log), "%s (pid: %d) exited with code %d, count: %d\n", 
+        sensor_name, sensor_pid, status, counter);
+}
+
+
+int create_cpu_sensor() {
+    // CPU sensor
+    cpu_pid = fork();
+    if (cpu_pid < 0) {
+        perror("fork");
+        return EXIT_FAILURE;
+    }
+
+    if (cpu_pid == 0) {
+
+        close(mem_fd);
+
+        char *argv[] = {"./bin/cpu_sensor", NULL};
+        execve("./bin/cpu_sensor", argv, NULL);
+
+        // Only reached if execve fails
+        perror("execve cpu sensor");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+
 void* mem_reading() {
     while (running) {
         read(mem_fds[0], &md, sizeof(md));
@@ -98,7 +135,14 @@ void* mem_reading() {
 
 void* cpu_reading() {
     while (running) {
-        read(cpu_fd, &cd, sizeof(cd));
+        if( read(cpu_fd, &cd, sizeof(cd)) == 0) {
+            counter++;
+            log_add("cpu_sensor", cpu_pid, status, counter);
+            waitpid(cpu_pid, &status, 0); 
+            create_cpu_sensor();
+            cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
+        } 
+        printf("cdcc: %f\n", cd.load1);
         notify_main();
     }
 
@@ -163,23 +207,7 @@ int main(void) {
     }
 
     // CPU sensor
-    cpu_pid = fork();
-    if (cpu_pid < 0) {
-        perror("fork");
-        return EXIT_FAILURE;
-    }
-
-    if (cpu_pid == 0) {
-
-        close(mem_fd);
-
-        char *argv[] = {"./bin/cpu_sensor", NULL};
-        execve("./bin/cpu_sensor", argv, NULL);
-
-        // Only reached if execve fails
-        perror("execve cpu sensor");
-        exit(EXIT_FAILURE);
-    }
+    create_cpu_sensor();
 
     // Proc
     proc_pid = fork();
