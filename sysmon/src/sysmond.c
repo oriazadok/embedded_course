@@ -35,7 +35,16 @@ static int proc_fd = -1;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
-char logger[256] = { 0 };
+// char logger[256] = { 0 };
+
+typedef struct Logger {
+    char mem_log[256];
+    char cpu_log[256];
+    char proc_log[256];
+} Logger;
+
+
+Logger logger = { 0 };
 
 
 void handle_shutdown() {
@@ -94,17 +103,39 @@ void notify_main() {
 
 void print_log() {
 
-    if (logger[0] == '\0') {
-        return;
+    if (logger.mem_log[0] != '\0') {
+        printf("[LOG]: %s\n", logger.mem_log);
     }
 
-    printf("[LOG]: %s\n", logger);
+    if (logger.cpu_log[0] != '\0') {
+        printf("[LOG]: %s\n", logger.cpu_log);
+    }
 
+    if (logger.proc_log[0] != '\0') {
+        printf("[LOG]: %s\n", logger.proc_log);
+    }
 }
 
 void log_add(char *sensor_name, int sensor_pid,int status, int counter) {
-    snprintf(logger, sizeof(logger), "%s (pid: %d) exited with code %d, count: %d\n", 
-        sensor_name, sensor_pid, status, counter);
+
+    pthread_mutex_lock(&lock);
+
+    if (strcmp(sensor_name, "mem_sensor") == 0) {
+        snprintf(logger.mem_log, sizeof(logger.mem_log), "%s (pid: %d) exited with code %d, Restart count: %d", 
+            sensor_name, sensor_pid, status, counter);
+    }
+
+    if (strcmp(sensor_name, "cpu_sensor") == 0) {
+        snprintf(logger.cpu_log, sizeof(logger.cpu_log), "%s (pid: %d) exited with code %d, Restart count: %d", 
+            sensor_name, sensor_pid, status, counter);
+    }
+
+    if (strcmp(sensor_name, "proc_sensor") == 0) {
+        snprintf(logger.proc_log, sizeof(logger.proc_log), "%s (pid: %d) exited with code %d, Restart count: %d", 
+            sensor_name, sensor_pid, status, counter);
+    }
+
+    pthread_mutex_unlock(&lock);
 }
 
 // Creation of sensors
@@ -118,6 +149,12 @@ int create_mem_sensor() {
     if (mem_pid == 0) {
 
         close(mem_fds[0]);
+        if(cpu_fd != -1) {
+            close(cpu_fd);
+        }
+        if(proc_fd != -1) {
+            close(proc_fd);
+        }
 
         char fd_mem_str[16];
         snprintf(fd_mem_str, sizeof(fd_mem_str), "%d", mem_fds[1]);
@@ -146,6 +183,13 @@ int create_cpu_sensor() {
     if (cpu_pid == 0) {
 
         close(mem_fd);
+        if(cpu_fd != -1) {
+            close(cpu_fd);
+        }
+        if(proc_fd != -1) {
+            close(proc_fd);
+        }
+
 
         char *argv[] = {"./bin/cpu_sensor", NULL};
         execve("./bin/cpu_sensor", argv, NULL);
@@ -168,6 +212,12 @@ int create_proc_sensor() {
     if (proc_pid == 0) {
 
         close(mem_fd);
+        if(cpu_fd != -1) {
+            close(cpu_fd);
+        }
+        if(proc_fd != -1) {
+            close(proc_fd);
+        }
 
         char *argv[] = {"./bin/proc_sensor", NULL};
         execve("./bin/proc_sensor", argv, NULL);
@@ -188,8 +238,8 @@ void* mem_reading() {
                 break;
             }
             counter++;
-            log_add("mem_sensor", mem_pid, status, counter);
             waitpid(mem_pid, &status, 0); 
+            log_add("mem_sensor", mem_pid, status, counter);
 
             close(mem_fds[0]);
             if(pipe(mem_fds) == -1) {
@@ -213,8 +263,8 @@ void* cpu_reading() {
                 break;
             }
             counter++;
-            log_add("cpu_sensor", cpu_pid, status, counter);
             waitpid(cpu_pid, &status, 0); 
+            log_add("cpu_sensor", cpu_pid, status, counter);
             create_cpu_sensor();
             int old_fd = cpu_fd;
             cpu_fd = open(CPU_FIFO_PATH, O_RDONLY);
@@ -235,10 +285,10 @@ void* proc_reading() {
                 break;
             }
             counter++;
-            log_add("proc_sensor", proc_pid, status, counter);
             waitpid(proc_pid, &status, 0); 
+            log_add("proc_sensor", proc_pid, status, counter);
             create_proc_sensor();
-            int old_fd = cpu_fd;
+            int old_fd = proc_fd;
             proc_fd = open(PROC_FIFO_PATH, O_RDONLY);
             close(old_fd);
         }
